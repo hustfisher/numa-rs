@@ -14,54 +14,17 @@ mod tests {
 }
 
 mod numa;
+mod node;
+mod set;
+mod mask;
 
 extern crate errno;
 
 use numa::*;
-use std::collections::HashSet;
+pub use set::{CpuSet, NodeSet};
+pub use mask::{CpuMask, NodeMask};
+pub use node::Node;
 
-type BitSet = HashSet<u64>;
-
-#[derive(Debug)]
-pub struct CpuSet(BitSet);
-#[derive(Debug)]
-pub struct NodeSet(BitSet);
-
-impl CpuSet {
-    pub fn new() -> CpuSet {
-        CpuSet(BitSet::new())
-    }
-}
-
-impl IntoIterator for CpuSet {
-    type Item = <BitSet as IntoIterator>::Item;
-    type IntoIter = <BitSet as IntoIterator>::IntoIter;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl IntoIterator for NodeSet {
-    type Item = <BitSet as IntoIterator>::Item;
-    type IntoIter = <BitSet as IntoIterator>::IntoIter;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl From<CpuMask> for CpuSet {
-    fn from(m: CpuMask) -> CpuSet {
-        let mut s = CpuSet::new();
-        for i in 0..m.len() {
-            if m.is_set(i) {
-                s.0.insert(i as u64);
-            }
-        }
-        s
-    }
-}
 
 
 #[derive(Clone, Debug)]
@@ -95,92 +58,7 @@ type Result<T> = std::result::Result<T, Error>;
 
 pub struct System {}
 
-struct NodeMask {
-    raw: *mut bitmask,
-}
 
-impl NodeMask {
-    pub fn new() -> NodeMask {
-        let raw = unsafe { numa_allocate_nodemask() };
-
-        NodeMask { raw: raw }
-    }
-
-    pub fn set(&mut self, u: usize) {
-        unsafe { numa_bitmask_setbit(self.raw, u as std::os::raw::c_uint) };
-    }
-
-
-
-    pub fn drop(&mut self) {
-        unsafe { numa_bitmask_free(self.raw) }
-    }
-}
-
-impl From<NodeSet> for NodeMask {
-    fn from(s: NodeSet) -> NodeMask {
-        let mut mask = NodeMask::new();
-
-        for e in s {
-            mask.set(e as usize);
-        }
-
-        mask
-    }
-}
-
-impl From<*mut bitmask> for NodeMask {
-    fn from(b: *mut bitmask) -> NodeMask {
-
-        let new = NodeMask::new();
-
-        unsafe {copy_bitmask_to_bitmask(b, new.raw)}
-
-        new
-    }
-}
-
-struct CpuMask {
-    raw: *mut bitmask,
-}
-
-impl CpuMask {
-    pub fn new() -> CpuMask {
-        let raw = unsafe { numa_allocate_cpumask() };
-
-        CpuMask { raw: raw }
-    }
-
-    pub fn set(&mut self, u: usize) {
-        unsafe { numa_bitmask_setbit(self.raw, u as std::os::raw::c_uint) };
-    }
-
-    pub fn is_set(&self, u: usize) -> bool {
-        match unsafe {numa_bitmask_isbitset(self.raw, u as u32)} {
-            0 => false,
-            _ => true
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        8 * unsafe {numa_bitmask_nbytes(self.raw)} as usize
-    }
-
-    pub fn drop(&mut self) {
-        unsafe { numa_bitmask_free(self.raw) }
-    }
-}
-
-impl From<*mut bitmask> for CpuMask {
-    fn from(b: *mut bitmask) -> CpuMask {
-
-        let new = CpuMask::new();
-
-        unsafe {copy_bitmask_to_bitmask(b, new.raw)}
-
-        new
-    }
-}
 
 impl System {
     pub fn new() -> System {
@@ -196,18 +74,13 @@ impl System {
     }
 
     pub fn all_cpus(&self) -> CpuSet {
-        /*
-        numa_all_cpus_ptr points to a bitmask that is allocated by the
-       library with bits representing all cpus on which the calling task may
-       execute.  This set may be up to all cpus on the system, or up to the
-       cpus in the current cpuset.  The bitmask is allocated by a call to
-       numa_allocate_cpumask() using size numa_num_possible_cpus().  The set
-       of cpus to record is derived from /proc/self/status, field
-       "Cpus_allowed".  The user should not alter this bitmask.
-       */
-
       let owned = CpuMask::from( unsafe {numa_all_cpus_ptr} );
       CpuSet::from(owned)
+    }
+
+    pub fn all_nodes(&self) -> NodeSet {
+      let owned = NodeMask::from( unsafe {numa_all_nodes_ptr} );
+      NodeSet::from(owned)
     }
 
     pub fn run_on(&self, nodes: NodeSet) -> Option<Error> {
@@ -220,9 +93,9 @@ impl System {
        indicate the error.
        */
 
-        let mask = NodeMask::from(nodes);
+        let mut mask = NodeMask::from(nodes);
 
-        let res = unsafe { numa_run_on_node_mask(mask.raw) };
+        let res = unsafe { numa_run_on_node_mask(mask.raw_mut()) };
 
         match res {
             0 => None,
