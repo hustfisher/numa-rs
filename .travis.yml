@@ -5,7 +5,6 @@ rust:
   - nightly
 
 os:
-  - osx
   - linux
 
 notifications:
