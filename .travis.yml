@@ -3,7 +3,7 @@ rust:
   - stable
   - beta
   - nightly
-sudo: required
+
 os:
   - osx
   - linux
@@ -15,8 +15,8 @@ notifications:
 branches:
   only:
     - master
+
 addons:
   apt:
     packages:
-      - ca-certificates
       - libnuma-dev
