@@ -1,9 +1,20 @@
 use std::collections::HashSet;
+use std::iter::FromIterator;
 
 use mask::{CpuMask, NodeMask};
 use node::Node;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
 
+    #[test]
+    fn nodeset_from_iter() {
+        let mut set: NodeSet = [0].iter().map(|i| Node::new(*i)).collect();
+        assert_eq!(2 + 2, 4);
+    }
+
+}
 
 #[derive(Debug)]
 pub struct CpuSet(HashSet<u64>);
@@ -55,6 +66,17 @@ impl IntoIterator for NodeSet {
         self.0.into_iter()
     }
 }
+
+// the trait `std::iter::FromIterator<node::Node>` is not implemented for `set::NodeSet`
+impl FromIterator<Node> for NodeSet {
+    fn from_iter<I: IntoIterator<Item=Node>>(iter: I) -> Self {
+        let mut s = NodeSet::new();
+        for i in iter {
+            s.0.insert(i);
+        }
+        s
+    }
+} 
 
 impl From<NodeMask> for NodeSet {
     fn from(m: NodeMask) -> NodeSet {
