@@ -67,7 +67,6 @@ impl IntoIterator for NodeSet {
     }
 }
 
-// the trait `std::iter::FromIterator<node::Node>` is not implemented for `set::NodeSet`
 impl FromIterator<Node> for NodeSet {
     fn from_iter<I: IntoIterator<Item=Node>>(iter: I) -> Self {
         let mut s = NodeSet::new();
