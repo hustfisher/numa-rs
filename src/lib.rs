@@ -56,13 +56,23 @@ impl From<errno::Errno> for Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
-pub struct System {}
+pub struct System {
+    all_cpus: CpuSet,
+    all_nodes: NodeSet,
+}
 
 
 
 impl System {
     pub fn new() -> System {
-        System {}
+
+        let all_cpus = CpuSet::from(CpuMask::from( unsafe {numa_all_cpus_ptr} ));
+        let all_nodes = NodeSet::from(NodeMask::from( unsafe {numa_all_nodes_ptr} ));
+
+        System {
+            all_cpus: all_cpus,
+            all_nodes: all_nodes,
+        }
     }
 
     pub fn is_available(&self) -> bool {
@@ -73,17 +83,15 @@ impl System {
         }
     }
 
-    pub fn all_cpus(&self) -> CpuSet {
-      let owned = CpuMask::from( unsafe {numa_all_cpus_ptr} );
-      CpuSet::from(owned)
+    pub fn all_cpus_ref(&self) -> &CpuSet {
+      &self.all_cpus
     }
 
-    pub fn all_nodes(&self) -> NodeSet {
-      let owned = NodeMask::from( unsafe {numa_all_nodes_ptr} );
-      NodeSet::from(owned)
+    pub fn all_nodes_ref(&self) -> &NodeSet {
+      &self.all_nodes
     }
 
-    pub fn run_on(&self, nodes: NodeSet) -> Option<Error> {
+    pub fn run_on(&mut self, nodes: NodeSet) -> Result<()> {
         /*
         numa_run_on_node() runs the current task and its children on a
        specific node. They will not migrate to CPUs of other nodes until the
@@ -98,10 +106,22 @@ impl System {
         let res = unsafe { numa_run_on_node_mask(mask.raw_mut()) };
 
         match res {
-            0 => None,
-            -1 => Some(Error::from(errno::errno())),
-            _ => Some(Error::new(ErrorKind::Unexpected, "numa_run_on_node_mask returned unexpected"))
+            0 => Ok(()),
+            -1 => Err(Error::from(errno::errno())),
+            _ => Err(Error::new(ErrorKind::Unexpected, "numa_run_on_node_mask returned unexpected"))
         }
+    }
+
+    /// get CPUs that the system is currently allowed to use
+    pub fn run_cpus(&self) -> CpuSet {
+        let mask = unsafe { numa_get_run_node_mask() };
+        CpuSet::from(CpuMask::from(mask))
+    }
+
+    /// get numa nodes that the sysm is currently allowed to use
+    pub fn run_nodes(&self) -> NodeSet {
+        let mask = unsafe { numa_get_membind() };
+        NodeSet::from(NodeMask::from(mask))
     }
 }
 

@@ -1,7 +1,7 @@
 use numa::*;
 use std;
 
-use set::{CpuSet, NodeSet};
+use set::{NodeSet};
 use std::ptr::NonNull;
 
 pub struct NodeMask {

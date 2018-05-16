@@ -41,6 +41,10 @@ impl NodeSet {
     pub fn new() -> NodeSet {
         NodeSet(HashSet::new())
     }
+
+    pub fn contains(&self, value: &Node) -> bool {
+        self.0.contains(value)
+    }
 }
 
 impl IntoIterator for NodeSet {
