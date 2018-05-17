@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::collections;
 use std::iter::FromIterator;
 
 use mask::{CpuMask, NodeMask};
@@ -13,6 +14,16 @@ mod tests {
         let mut set: NodeSet = [0].iter().map(|i| Node::new(*i)).collect();
         assert_eq!(2 + 2, 4);
     }
+
+    #[test]
+    fn nodeset_iter() {
+        let mut blah: HashSet<u64> = HashSet::new();
+        for node in &blah {
+            println!("{:?}", node);
+        };
+        assert_eq!(2 + 2, 4);
+    }
+
 
 }
 
@@ -55,6 +66,10 @@ impl NodeSet {
 
     pub fn contains(&self, value: &Node) -> bool {
         self.0.contains(value)
+    }
+
+    pub fn iter<'a>(&'a self) -> collections::hash_set::Iter<'a, Node> {
+        self.0.iter()
     }
 }
 
